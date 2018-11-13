@@ -23,13 +23,17 @@
 
 // my includes
 #define WRONG_NUMBER_OF_ARGS 4
-#define USAGE_ERROR "Usage:   \n"
+#define USAGE_ERROR "Usage: <path_to_sequence_file> <m> <s> <g>  \n"
 #define FILE_NAME 1
 #define BAD_FILE_NAME_ERROR "Error opening file: %s\n"
 #define  MAX_LINE_LENGTH 100
 #define HEADER_START '>'
 #define FIRST_SEQUENCE 1
 #define MEMORY_ALLOCTION_ERROR "ERROR: failure to allocate memory\n"
+#define M 2
+#define S 3
+#define G 4
+#define CONVERSION_ERROR "Error in weight conversion %s!\n"
 
 
 typedef struct Sequence
@@ -144,8 +148,12 @@ int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLin
     return 0;
 }
 
+void calculateScores(int size, Sequence *currentSequence, const int weights[])
+{
 
-int readLines(const FILE *currentFile)
+}
+
+int readLines(const FILE *currentFile, const int weights[3])
 {
     int i = -1;
     char currentLine[MAX_LINE_LENGTH] = {0};
@@ -175,13 +183,34 @@ int readLines(const FILE *currentFile)
             }
         }
     }
+    calculateScores(i, currentSequence, weights);
     freeSequences(currentSequence, i);
     return 0;
 }
 
-
-
-
+/**
+ * extract the weights from program args
+ * @param argv  program args
+ * @param weightArray where to put them
+ * @return the new weights
+ */
+int* calculateWeights(char **argv, int weightArray[S])
+{
+    int k;
+    for (k = 2; k < G; ++k)
+    {
+        char *end;
+        errno = 0;
+        int currentCoordinate = (int) strtof(argv[k], &end);
+        if (currentCoordinate == 0 && (errno != 0 || end == argv[k]))
+        {
+            fprintf(stderr, CONVERSION_ERROR, argv[k]);
+            return NULL;
+        }
+        weightArray[k-2] = currentCoordinate;
+    }
+    return weightArray;
+}
 
 
 int main(int argc, char *argv[]) 
@@ -200,7 +229,20 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-	    readLines(currentFile);
+	    int weightArray[S] = {0};
+	    int *updatedWeights = NULL;
+	    updatedWeights = calculateWeights(argv, updatedWeights);
+	    if(updatedWeights == NULL)
+        {
+            fclose(currentFile);
+            return -1;
+        }
+	    int i = readLines(currentFile, weightArray);
+	    if(i != 0)
+        {
+            fclose(currentFile);
+            return -1;
+        }
 		//do something
 		fclose(currentFile);
 	}
