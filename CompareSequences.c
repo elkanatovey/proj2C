@@ -28,7 +28,6 @@
 #define BAD_FILE_NAME_ERROR "Error opening file: %s\n"
 #define  MAX_LINE_LENGTH 100
 #define HEADER_START '>'
-#define TITLE_LOCATION 0
 #define FIRST_SEQUENCE 1
 #define MEMORY_ALLOCTION_ERROR "ERROR: failure to allocate memory\n"
 
@@ -67,9 +66,7 @@ int cleanLine(char *currentLine)
 void freeSequencePointers(Sequence currentSequence)
 {
     free(currentSequence.actualSequence);
-    currentSequence.actualSequence = NULL;
     free(currentSequence.sequenceName);
-    currentSequence.sequenceName = NULL;
 }
 
 /**
@@ -84,7 +81,6 @@ void freeSequences(Sequence *currentSequence, int size)
         freeSequencePointers(currentSequence[i]);
     }
     free(currentSequence);
-    currentSequence = NULL;
 }
 
 
@@ -149,7 +145,7 @@ int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLin
 }
 
 
-int readLines(const FILE *currentFile, char *fileName)
+int readLines(const FILE *currentFile)
 {
     int i = -1;
     char currentLine[MAX_LINE_LENGTH] = {0};
@@ -160,7 +156,6 @@ int readLines(const FILE *currentFile, char *fileName)
         fprintf(stderr, MEMORY_ALLOCTION_ERROR);
         return -1;
     }
-    else
     while(fgets(currentLine, MAX_LINE_LENGTH, (FILE *) currentFile) != NULL)
     {  //possible edge case empty line
         int lineSize = cleanLine(currentLine);
@@ -178,17 +173,7 @@ int readLines(const FILE *currentFile, char *fileName)
             {
                 return -1;
             }
-//            currentSequence[i].actualSequence = (char*)realloc(currentSequence[i].actualSequence,
-//                    sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize));
-//            currentSequence[i].actualSequenceSize = currentSequence[i].actualSequenceSize+lineSize;
-//            strncat(currentSequence[i].actualSequence, currentLine, sizeof(char)*lineSize);
         }
-    }
-    int k;
-    for(k = 0; k <= i; k++)
-    {
-        printf( "%s\n", currentSequence[k].actualSequence);
-//        printf('%d\n',0);
     }
     freeSequences(currentSequence, i);
     return 0;
@@ -215,10 +200,18 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-	    readLines(currentFile, argv[FILE_NAME]);
+	    readLines(currentFile);
 		//do something
 		fclose(currentFile);
 	}
 //    printf("Hello, World!\n");
     return 0;
 }
+
+
+//int k;
+//    for(k = 0; k <= i; k++)
+//    {
+//        printf( "%s\n", currentSequence[k].actualSequence);
+////        printf('%d\n',0);
+//    }
