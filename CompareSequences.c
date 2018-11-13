@@ -22,7 +22,7 @@
 #include <string.h>
 
 // my includes
-#define WRONG_NUMBER_OF_ARGS 4
+#define WRONG_NUMBER_OF_ARGS 5
 #define USAGE_ERROR "Usage: <path_to_sequence_file> <m> <s> <g>  \n"
 #define FILE_NAME 1
 #define BAD_FILE_NAME_ERROR "Error opening file: %s\n"
@@ -116,7 +116,7 @@ Sequence* createNewSequence(Sequence *currentSequence, int newSize, char header[
     currentSequence[newSize - 1].sequenceNameSize = lineSize;
     currentSequence[newSize - 1].sequenceName = NULL;
     currentSequence[newSize - 1].actualSequence = NULL;
-    currentSequence[newSize - 1].sequenceName = (char*)malloc(sizeof(char)*lineSize);
+    currentSequence[newSize - 1].sequenceName = (char*)malloc(sizeof(char)*lineSize+1);
     currentSequence[newSize - 1].actualSequence = (char*)malloc(sizeof(char)*1);
     if(currentSequence[newSize - 1].actualSequence == NULL ||
         currentSequence[newSize - 1].sequenceName == NULL)
@@ -135,7 +135,7 @@ int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLin
 {
     char *tempSequence = NULL;
     tempSequence = (char*)realloc(currentSequence[i].actualSequence,
-                   sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize));
+                   sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize+1));
     if(tempSequence == NULL)
     {
         freeSequences(currentSequence, i-1);
@@ -194,12 +194,12 @@ int readLines(const FILE *currentFile, const int weights[3])
  * @param weightArray where to put them
  * @return the new weights
  */
-int* calculateWeights(char **argv, int weightArray[S])
+int* calculateWeights(char **argv, int weightArray[])
 {
     int k;
     for (k = 2; k < G; ++k)
     {
-        char *end;
+        char *end = NULL;
         errno = 0;
         int currentCoordinate = (int) strtof(argv[k], &end);
         if (currentCoordinate == 0 && (errno != 0 || end == argv[k]))
@@ -231,13 +231,14 @@ int main(int argc, char *argv[])
 	{
 	    int weightArray[S] = {0};
 	    int *updatedWeights = NULL;
-	    updatedWeights = calculateWeights(argv, updatedWeights);
+	    updatedWeights = calculateWeights(argv, weightArray);
 	    if(updatedWeights == NULL)
         {
             fclose(currentFile);
             return -1;
         }
-	    int i = readLines(currentFile, weightArray);
+	    int i = readLines(currentFile, updatedWeights);
+//	    free(updatedWeights);
 	    if(i != 0)
         {
             fclose(currentFile);
