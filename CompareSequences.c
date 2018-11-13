@@ -29,7 +29,8 @@
 #define  MAX_LINE_LENGTH 100
 #define HEADER_START '>'
 #define TITLE_LOCATION 0
-#define SEQUENCE_LOCATION 1
+#define FIRST_SEQUENCE 1
+#define MEMORY_ALLOCTION_ERROR "ERROR: failure to allocate memory\n"
 
 
 typedef struct Sequence
@@ -39,6 +40,7 @@ typedef struct Sequence
     char *actualSequence;
     int actualSequenceSize;
 }Sequence;
+
 
 /**
  * removes  carriage return and end of line symbols from stringd by null terminating at correct
@@ -58,58 +60,128 @@ int cleanLine(char *currentLine)
 }
 
 
-
-char* createSpaceInSequence(char *sequenceHolder, int lineSize, char *currentLine)
+/**
+ * frees header and sequence pointers in a Sequence struct
+ * @param currentSequence the individual sequence
+ */
+void freeSequencePointers(Sequence currentSequence)
 {
-    int size = 0;
-    if(sequenceHolder == NULL)
-    {
-        size = lineSize;
+    free(currentSequence.actualSequence);
+    currentSequence.actualSequence = NULL;
+    free(currentSequence.sequenceName);
+    currentSequence.sequenceName = NULL;
+}
+
+/**
+ * Frees sequence by sequence
+ * @param currentSequence the total sequence pointer
+ * @param size the number of existing sequences
+ */
+void freeSequences(Sequence *currentSequence, int size)
+{
+    int i;
+    for (i = size; i >=0 ; i--) {
+        freeSequencePointers(currentSequence[i]);
     }
-    else
-    {
-        size = lineSize + (int) sizeof(sequenceHolder);
-    }
-    char *sequence_temp = (char*)realloc(sequenceHolder, sizeof(char)*size );
-    if(sequence_temp == NULL)
-    {
-        //free etc
-        return NULL;
-    }
-    sequenceHolder = sequence_temp;
-    sequenceHolder = strncpy(sequenceHolder, currentLine, sizeof(char)*lineSize);
-    return sequenceHolder;
+    free(currentSequence);
+    currentSequence = NULL;
 }
 
 
+/**
+ * Dynamically add new sequences if necessarry
+ * @param currentSequence the sequence pointer
+ * @param newSize the new size
+ * @param header the name
+ * @param lineSize size of current line
+ * @return our updated sequence pointer
+ */
+Sequence* createNewSequence(Sequence *currentSequence, int newSize, char header[], int lineSize)
+{
+    Sequence *tempSequence = realloc(currentSequence, sizeof(Sequence)*newSize);
+    if(tempSequence == NULL)
+    {
+        if(newSize > FIRST_SEQUENCE)
+        {
+            freeSequences(currentSequence, (newSize - 1));
+        }
+        else
+        {
+            free(currentSequence);
+        }
+        fprintf(stderr, MEMORY_ALLOCTION_ERROR);
+        return NULL;
+    }
+    currentSequence = tempSequence;
+    currentSequence[newSize - 1].sequenceNameSize = lineSize;
+    currentSequence[newSize - 1].sequenceName = NULL;
+    currentSequence[newSize - 1].actualSequence = NULL;
+    currentSequence[newSize - 1].sequenceName = (char*)malloc(sizeof(char)*lineSize);
+    currentSequence[newSize - 1].actualSequence = (char*)malloc(sizeof(char)*1);
+    if(currentSequence[newSize - 1].actualSequence == NULL ||
+        currentSequence[newSize - 1].sequenceName == NULL)
+    {
+        freeSequences(currentSequence, (newSize - 1));
+        fprintf(stderr, MEMORY_ALLOCTION_ERROR);
+        return NULL;
+    }
+    strncat(currentSequence[newSize - 1].sequenceName, header, sizeof(char)*lineSize);
+    currentSequence[newSize - 1].actualSequenceSize = 0;
+    return currentSequence;
+}
+
+
+int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLine[])
+{
+    char *tempSequence = NULL;
+    tempSequence = (char*)realloc(currentSequence[i].actualSequence,
+                   sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize));
+    if(tempSequence == NULL)
+    {
+        freeSequences(currentSequence, i-1);
+        fprintf(stderr, MEMORY_ALLOCTION_ERROR);
+        return -1;
+    }
+    currentSequence[i].actualSequence = tempSequence;
+    currentSequence[i].actualSequenceSize = currentSequence[i].actualSequenceSize+lineSize;
+    strncat(currentSequence[i].actualSequence, currentLine, sizeof(char)*lineSize);
+    return 0;
+}
 
 
 int readLines(const FILE *currentFile, char *fileName)
 {
     int i = -1;
     char currentLine[MAX_LINE_LENGTH] = {0};
-    Sequence *currentSequence;
-    currentSequence = (Sequence*)realloc(currentSequence, sizeof(Sequence)*(1));
+    Sequence *currentSequence = NULL;
+    currentSequence = (Sequence*)malloc(sizeof(Sequence)*(1));
+    if(currentSequence == NULL)
+    {
+        fprintf(stderr, MEMORY_ALLOCTION_ERROR);
+        return -1;
+    }
+    else
     while(fgets(currentLine, MAX_LINE_LENGTH, (FILE *) currentFile) != NULL)
     {  //possible edge case empty line
         int lineSize = cleanLine(currentLine);
         if (currentLine[0] == HEADER_START) {
             i++;
-            currentSequence = (Sequence*)realloc(currentSequence, sizeof(Sequence)*(i+1));
-            currentSequence[i].sequenceNameSize = lineSize;
-            currentSequence[i].sequenceName = (char*)malloc(sizeof(char)*lineSize);
-            strncpy(currentSequence[i].sequenceName, currentLine, sizeof(char)*lineSize);
-
-            currentSequence[i].actualSequenceSize = 0;
-            currentSequence[i].actualSequence = (char*)malloc(sizeof(char)*1);
-
+            currentSequence = createNewSequence(currentSequence, (i + 1), currentLine, lineSize);
+            if(currentSequence == NULL)
+            {
+                return -1;  // freed in createNewLines
+            }
         }
         else
         {
-            currentSequence[i].actualSequence = (char*)realloc(currentSequence[i].actualSequence,
-                    sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize));
-            currentSequence[i].actualSequenceSize = currentSequence[i].actualSequenceSize+lineSize;
-            strncpy(currentSequence[i].actualSequence, currentLine, sizeof(char)*lineSize);
+            if(growLineSize(currentSequence, i, lineSize, currentLine))
+            {
+                return -1;
+            }
+//            currentSequence[i].actualSequence = (char*)realloc(currentSequence[i].actualSequence,
+//                    sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize));
+//            currentSequence[i].actualSequenceSize = currentSequence[i].actualSequenceSize+lineSize;
+//            strncat(currentSequence[i].actualSequence, currentLine, sizeof(char)*lineSize);
         }
     }
     int k;
@@ -118,7 +190,7 @@ int readLines(const FILE *currentFile, char *fileName)
         printf( "%s\n", currentSequence[k].actualSequence);
 //        printf('%d\n',0);
     }
-
+    freeSequences(currentSequence, i);
     return 0;
 }
 
