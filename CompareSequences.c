@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <math.h>
 
 // my includes
 #define WRONG_NUMBER_OF_ARGS 5
@@ -34,7 +35,10 @@
 #define S 3
 #define G 4
 #define CONVERSION_ERROR "Error in weight conversion %s!\n"
-
+#define MATCH 0
+#define MISMATCH 1
+#define GAP 2
+#define new_max(x,y) ((x) >= (y)) ? (x) : (y)
 
 typedef struct Sequence
 {
@@ -116,8 +120,8 @@ Sequence* createNewSequence(Sequence *currentSequence, int newSize, char header[
     currentSequence[newSize - 1].sequenceNameSize = lineSize;
     currentSequence[newSize - 1].sequenceName = NULL;
     currentSequence[newSize - 1].actualSequence = NULL;
-    currentSequence[newSize - 1].sequenceName = (char*)malloc(sizeof(char)*lineSize+1);
-    currentSequence[newSize - 1].actualSequence = (char*)malloc(sizeof(char)*1);
+    currentSequence[newSize - 1].sequenceName = (char*)calloc((lineSize+1), sizeof(char));
+    currentSequence[newSize - 1].actualSequence = (char*)calloc(1, sizeof(char));
     if(currentSequence[newSize - 1].actualSequence == NULL ||
         currentSequence[newSize - 1].sequenceName == NULL)
     {
@@ -135,7 +139,8 @@ int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLin
 {
     char *tempSequence = NULL;
     tempSequence = (char*)realloc(currentSequence[i].actualSequence,
-                   sizeof(char)*(currentSequence[i].actualSequenceSize+lineSize+1));
+                   sizeof(char)*((strlen(currentSequence[i].actualSequence)+strlen(currentLine)
+                   +4)));
     if(tempSequence == NULL)
     {
         freeSequences(currentSequence, i-1);
@@ -143,20 +148,112 @@ int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLin
         return -1;
     }
     currentSequence[i].actualSequence = tempSequence;
-    currentSequence[i].actualSequenceSize = currentSequence[i].actualSequenceSize+lineSize;
-    strncat(currentSequence[i].actualSequence, currentLine, sizeof(char)*lineSize);
+    currentSequence[i].actualSequenceSize = currentSequence[i].actualSequenceSize+lineSize + 1;
+    strncat(currentSequence[i].actualSequence, currentLine, sizeof(char)*lineSize + 1);
     return 0;
 }
 
+
+void freeTable(int **table, int side1)
+{
+    for (int i = 0; i < side1; i++)
+    {
+        free(table[i]);
+    }
+    free(table);
+}
+
+
+/**
+ * creates a 2d table array of pointers
+ * @param side1 [side1][side2]
+ * @param side2 see above
+ * @param table the table array
+ * @return table[side1][side2]
+ */
+int **createTable(int side1, int side2, int **table)
+{
+    int **temp = (int**)malloc(sizeof(int*)*(side1));
+    if(temp == NULL)
+    {
+        return NULL;
+    }
+    table = temp;
+    int k;
+    for (k = 0; k < side1 ; k++)
+    {
+        int *columnTemp = (int*)malloc(sizeof(int)*side2);
+        if(columnTemp == NULL)
+        {
+            for (int j = 0; j <= k ; k++)
+            {
+                free(table[j]);
+            }
+            fprintf(stderr, MEMORY_ALLOCTION_ERROR);
+            return NULL;
+        }
+        table[k] = columnTemp;
+    }
+    return table;
+}
+
+void fillTable(int **table, Sequence sequence1, Sequence sequence2, const int weights[])
+{
+    int i;
+    for (i = 0; i <= (sequence1.actualSequenceSize + 1); i++)
+    {
+        table[i][0] = i*weights[GAP];
+    }
+    for (i = 0; i <= (sequence2.actualSequenceSize + 1); i++)
+    {
+        table[0][i] = i*weights[GAP];
+    }
+
+    for (i = 1; i <= (sequence1.actualSequenceSize + 1) ; i++)
+    {
+        for (int j = 1; j <= (sequence2.actualSequenceSize + 1); j++)
+        {
+            int match = table[i-1][j-1] + weights[MISMATCH];
+            if(sequence1.actualSequence[i-1] == sequence2.actualSequence[i-1])
+            {
+                match = table[i-1][j-1] + weights[MATCH];
+            }
+            int upGap = table[i][j - 1] + weights[GAP];
+            int sideGap = table[i - 1][j] + weights[GAP];
+            int finalGap = new_max(upGap, sideGap);
+            table[i][j] = new_max(finalGap, match);
+        }
+    }
+    printf("%d\n", table[sequence1.actualSequenceSize][sequence2.actualSequenceSize]);
+}
+
+
 void calculateScores(int size, Sequence *currentSequence, const int weights[])
 {
+    int i;
+    for(i = 0; i < size; i++)
+    {
+        int k;
+        for (k = i + 1; k <= size ; k++)
+        {
+            int **table = NULL;
+            table = createTable(currentSequence[i].actualSequenceSize+2, currentSequence[k]
+                                      .actualSequenceSize+2, table);
+            if(table == NULL)
+            {
+                return;
+            }
+            fillTable(table, currentSequence[i], currentSequence[k], weights);
 
+            freeTable(table, currentSequence[i].actualSequenceSize+2);
+        }
+    }
 }
 
 int readLines(const FILE *currentFile, const int weights[3])
 {
     int i = -1;
-    char currentLine[MAX_LINE_LENGTH] = {0};
+    char currentLine[MAX_LINE_LENGTH+1] = {0};
     Sequence *currentSequence = NULL;
     currentSequence = (Sequence*)malloc(sizeof(Sequence)*(1));
     if(currentSequence == NULL)
@@ -164,7 +261,7 @@ int readLines(const FILE *currentFile, const int weights[3])
         fprintf(stderr, MEMORY_ALLOCTION_ERROR);
         return -1;
     }
-    while(fgets(currentLine, MAX_LINE_LENGTH, (FILE *) currentFile) != NULL)
+    while(fgets(currentLine, MAX_LINE_LENGTH+1, (FILE *) currentFile) != NULL)
     {  //possible edge case empty line
         int lineSize = cleanLine(currentLine);
         if (currentLine[0] == HEADER_START) {
