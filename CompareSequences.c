@@ -140,7 +140,7 @@ int growLineSize(Sequence *currentSequence, int i, int lineSize, char currentLin
     char *tempSequence = NULL;
     tempSequence = (char*)realloc(currentSequence[i].actualSequence,
                    sizeof(char)*((strlen(currentSequence[i].actualSequence)+strlen(currentLine)
-                   +4)));
+                   +2)));
     if(tempSequence == NULL)
     {
         freeSequences(currentSequence, i-1);
@@ -214,7 +214,7 @@ void fillTable(int **table, Sequence sequence1, Sequence sequence2, const int we
         for (int j = 1; j <= (sequence2.actualSequenceSize + 1); j++)
         {
             int match = table[i-1][j-1] + weights[MISMATCH];
-            if(sequence1.actualSequence[i-1] == sequence2.actualSequence[i-1])
+            if(sequence1.actualSequence[i-1] == sequence2.actualSequence[j-1])
             {
                 match = table[i-1][j-1] + weights[MATCH];
             }
